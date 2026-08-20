@@ -763,55 +763,6 @@ def suggestions_page(
 
 
     # ======================================
-    # SPORT
-    # Suggestions are intentionally
-    # evaluated inside one sport at a time.
-    # ======================================
-
-    sport_options = sorted(
-        filtered["sport"]
-        .dropna()
-        .unique()
-        .tolist()
-    )
-
-
-    if not sport_options:
-
-        st.warning(
-            "No sports available "
-            "for the selected source."
-        )
-
-        return
-
-
-    default_sport_index = (
-        sport_options.index(
-            "Basketball"
-        )
-        if "Basketball"
-        in sport_options
-        else 0
-    )
-
-
-    selected_sport = (
-        st.selectbox(
-            "Sport",
-            sport_options,
-            index=default_sport_index
-        )
-    )
-
-
-    filtered = filtered[
-        filtered["sport"]
-        == selected_sport
-    ].copy()
-
-
-    # ======================================
     # SPECIFIC TIPSTER
     # ======================================
 
@@ -1416,7 +1367,6 @@ def suggestions_page(
 
     columns_to_show = [
         "bet_date",
-        "sport",
         "league",
         "scope",
         "event",

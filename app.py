@@ -7,16 +7,15 @@ from datetime import date, datetime, timezone
 from supabase import create_client
 
 from options import (
-    DEFAULT_SPORT,
-    SPORTS,
+    SPORT,
+    LEAGUES,
     BOOKMAKERS,
-    get_leagues,
-    get_scope_options,
-    get_default_markets,
-    get_periods,
-    get_reasons,
-    get_market_style,
-    get_winner_side_options
+    PLAYER_MARKETS,
+    TEAM_MARKETS,
+    MATCH_MARKETS,
+    OUTRIGHT_MARKETS,
+    PERIODS,
+    REASONS
 )
 
 from analytics import analysis_page
@@ -29,7 +28,7 @@ from suggestions import suggestions_page
 
 st.set_page_config(
     page_title="Bet Tracker",
-    page_icon="🎯",
+    page_icon="🏀",
     layout="centered"
 )
 
@@ -152,75 +151,82 @@ def safe_index(
         return default
 
 
-def get_market_options(
-    scope,
-    sport=DEFAULT_SPORT
-):
-    return get_default_markets(
-        sport,
-        scope
-    )
+def get_market_options(scope):
 
+    if scope == "PLAYER":
+        return PLAYER_MARKETS
+
+    if scope == "TEAM":
+        return TEAM_MARKETS
+
+    if scope == "MATCH":
+        return MATCH_MARKETS
+
+    if scope == "OUTRIGHT":
+        return OUTRIGHT_MARKETS
+
+    return []
 
 
 def outright_needs_second_selection(
-    market,
-    sport=DEFAULT_SPORT
+    market
 ):
-    if market in [
-        "Final Matchup",
-        "Straight Forecast"
-    ]:
-        return True
 
-    if (
-        sport == "Basketball"
-        and market.startswith("Top ")
-        and market.endswith(" - Team")
-    ):
-        return True
-
-    return False
-
+    return (
+        market in [
+            "Final Matchup",
+            "Straight Forecast"
+        ]
+        or (
+            market.startswith("Top ")
+            and market.endswith(" - Team")
+        )
+    )
 
 
 def outright_selection_labels(
-    market,
-    sport=DEFAULT_SPORT
+    market
 ):
-    if sport == "Tennis":
-        if market == "Final Matchup":
-            return ("Player 1", "Player 2")
-        if market == "Straight Forecast":
-            return ("Winner", "Runner-up")
-        return ("Player", None)
-
-    if sport == "Football":
-        if market == "Final Matchup":
-            return ("Team 1", "Team 2")
-        if market == "Straight Forecast":
-            return ("Winner", "Runner-up")
-        if market in ["Top Goalscorer", "Top Assists"]:
-            return ("Player", None)
-        return ("Team", None)
 
     if market == "Final Matchup":
-        return ("Team 1", "Team 2")
+
+        return (
+            "Team 1",
+            "Team 2"
+        )
+
 
     if market == "Straight Forecast":
-        return ("1st Place", "2nd Place")
+
+        return (
+            "1st Place",
+            "2nd Place"
+        )
+
 
     if (
         market.startswith("Top ")
         and market.endswith(" - Team")
     ):
-        return ("Player", "Team")
+
+        return (
+            "Player",
+            "Team"
+        )
+
 
     if market.startswith("Top "):
-        return ("Player", None)
 
-    return ("Team", None)
+        return (
+            "Player",
+            None
+        )
 
+
+    return (
+        "Selection",
+        None
+    )
 
 
 def format_bet_selection(
@@ -410,7 +416,7 @@ def calculate_profit(
 def login_page():
 
     st.title(
-        "🎯 Bet Tracker"
+        "🏀 Bet Tracker"
     )
 
     st.caption(
@@ -423,14 +429,12 @@ def login_page():
     ):
 
         email = st.text_input(
-            "Email",
-            autocomplete="username"
+            "Email"
         )
 
         password = st.text_input(
             "Password",
-            type="password",
-            autocomplete="current-password"
+            type="password"
         )
 
         submitted = (
@@ -439,12 +443,6 @@ def login_page():
                 use_container_width=True
             )
         )
-
-
-    st.caption(
-        "💾 Your browser can offer to save the login "
-        "for this device."
-    )
 
 
     if submitted:
@@ -974,24 +972,27 @@ def restore_bet(bet_id):
 # ENTRY AUTOCOMPLETE
 # ==========================================
 
-def load_entry_suggestions(
-    sport
-):
+def load_entry_suggestions():
+
     rows = []
     page_size = 1000
     start = 0
 
     try:
+
         while True:
+
             response = (
                 supabase
                 .table("bets")
                 .select(
                     "event,scope,subject,"
-                    "selection_2,market,sport"
+                    "selection_2,market"
                 )
-                .eq("is_deleted", False)
-                .eq("sport", sport)
+                .eq(
+                    "is_deleted",
+                    False
+                )
                 .range(
                     start,
                     start + page_size - 1
@@ -1000,6 +1001,7 @@ def load_entry_suggestions(
             )
 
             page = response.data or []
+
             rows.extend(page)
 
             if len(page) < page_size:
@@ -1008,615 +1010,289 @@ def load_entry_suggestions(
             start += page_size
 
     except Exception:
+
         rows = []
+
 
     regular_events = []
     outright_events = []
     players = []
     teams = []
 
+
     for bet in rows:
+
         scope = bet.get("scope")
-        event = (bet.get("event") or "").strip()
-        subject = (bet.get("subject") or "").strip()
-        selection_2 = (bet.get("selection_2") or "").strip()
-        market = bet.get("market") or ""
+
+        event = (
+            bet.get("event")
+            or ""
+        ).strip()
+
+        subject = (
+            bet.get("subject")
+            or ""
+        ).strip()
+
+        selection_2 = (
+            bet.get("selection_2")
+            or ""
+        ).strip()
+
+        market = (
+            bet.get("market")
+            or ""
+        )
+
 
         if event:
+
             if scope == "OUTRIGHT":
-                outright_events.append(event)
+
+                outright_events.append(
+                    event
+                )
+
             else:
-                regular_events.append(event)
+
+                regular_events.append(
+                    event
+                )
+
 
         if scope == "PLAYER":
+
             if subject:
-                players.append(subject)
+                players.append(
+                    subject
+                )
+
 
         elif scope == "TEAM":
+
             if subject:
-                teams.append(subject)
+                teams.append(
+                    subject
+                )
+
 
         elif scope == "OUTRIGHT":
-            if sport == "Tennis":
+
+            if market.startswith("Top "):
+
                 if subject:
-                    players.append(subject)
+                    players.append(
+                        subject
+                    )
+
+                if (
+                    market.endswith(" - Team")
+                    and selection_2
+                ):
+
+                    teams.append(
+                        selection_2
+                    )
+
+
+            elif market in [
+                "Final Matchup",
+                "Straight Forecast"
+            ]:
+
+                if subject:
+                    teams.append(
+                        subject
+                    )
+
                 if selection_2:
-                    players.append(selection_2)
+                    teams.append(
+                        selection_2
+                    )
 
-            elif (
-                sport == "Football"
-                and market in ["Top Goalscorer", "Top Assists"]
-            ):
-                if subject:
-                    players.append(subject)
-
-            elif (
-                sport == "Basketball"
-                and market.startswith("Top ")
-            ):
-                if subject:
-                    players.append(subject)
-                if market.endswith(" - Team") and selection_2:
-                    teams.append(selection_2)
-
-            elif market in ["Final Matchup", "Straight Forecast"]:
-                if subject:
-                    teams.append(subject)
-                if selection_2:
-                    teams.append(selection_2)
 
             else:
+
                 if subject:
-                    teams.append(subject)
+                    teams.append(
+                        subject
+                    )
+
 
     def clean(values):
+
         unique = {}
+
         for value in values:
-            value = str(value).strip()
+
+            value = str(
+                value
+            ).strip()
+
             if not value:
                 continue
+
             key = value.casefold()
+
             if key not in unique:
                 unique[key] = value
+
+
         return sorted(
             unique.values(),
             key=lambda x: x.casefold()
         )
 
-    return {
-        "regular_events": clean(regular_events),
-        "outright_events": clean(outright_events),
-        "players": clean(players),
-        "teams": clean(teams)
-    }
 
+    return {
+
+        "regular_events":
+            clean(
+                regular_events
+            ),
+
+        "outright_events":
+            clean(
+                outright_events
+            ),
+
+        "players":
+            clean(
+                players
+            ),
+
+        "teams":
+            clean(
+                teams
+            )
+    }
 
 
 # ==========================================
 # ADD BET
 # ==========================================
 
-
-# ==========================================
-# STICKY ENTRY / CUSTOM OPTIONS
-# ==========================================
-
-def _remember_entry_value(
-    bucket,
-    value,
-    sport=None,
-    scope=None
-):
-    if value is None:
-        return
-
-    value = str(value).strip()
-
-    if not value:
-        return
-
-    memory_key = "::".join([
-        str(sport or "ALL"),
-        str(scope or "ALL"),
-        str(bucket)
-    ])
-
-    if "_recent_entry_suggestions" not in st.session_state:
-        st.session_state["_recent_entry_suggestions"] = {}
-
-    recent = st.session_state["_recent_entry_suggestions"]
-    values = recent.get(memory_key, [])
-    existing = {str(v).casefold() for v in values}
-
-    if value.casefold() not in existing:
-        values.append(value)
-
-    recent[memory_key] = values
-
-
-
-def _merge_recent_entry_options(
-    bucket,
-    values,
-    sport=None,
-    scope=None
-):
-    values = list(values or [])
-
-    memory_key = "::".join([
-        str(sport or "ALL"),
-        str(scope or "ALL"),
-        str(bucket)
-    ])
-
-    recent = (
-        st.session_state
-        .get("_recent_entry_suggestions", {})
-        .get(memory_key, [])
-    )
-
-    combined = []
-    seen = set()
-
-    for value in values + recent:
-        if value is None:
-            continue
-
-        value = str(value).strip()
-
-        if not value:
-            continue
-
-        key = value.casefold()
-
-        if key in seen:
-            continue
-
-        seen.add(key)
-        combined.append(value)
-
-    return combined
-
-
-
-def load_user_league_options(
-    sport
-):
-    saved_leagues = []
-    page_size = 1000
-    start = 0
-
-    try:
-        while True:
-            response = (
-                supabase
-                .table("bets")
-                .select("league")
-                .eq("is_deleted", False)
-                .eq("sport", sport)
-                .range(
-                    start,
-                    start + page_size - 1
-                )
-                .execute()
-            )
-
-            page = response.data or []
-
-            for row in page:
-                league = (row.get("league") or "").strip()
-                if league:
-                    saved_leagues.append(league)
-
-            if len(page) < page_size:
-                break
-
-            start += page_size
-
-    except Exception:
-        pass
-
-    return _merge_recent_entry_options(
-        "leagues",
-        get_leagues(sport) + saved_leagues,
-        sport=sport
-    )
-
-
-def load_user_market_options(
-    sport,
-    scope
-):
-    saved_markets = []
-    page_size = 1000
-    start = 0
-
-    try:
-        while True:
-            response = (
-                supabase
-                .table("bets")
-                .select("market")
-                .eq("is_deleted", False)
-                .eq("sport", sport)
-                .eq("scope", scope)
-                .range(
-                    start,
-                    start + page_size - 1
-                )
-                .execute()
-            )
-
-            page = response.data or []
-
-            for row in page:
-                market = (row.get("market") or "").strip()
-                if market:
-                    saved_markets.append(market)
-
-            if len(page) < page_size:
-                break
-
-            start += page_size
-
-    except Exception:
-        pass
-
-    return _merge_recent_entry_options(
-        "markets",
-        get_default_markets(
-            sport,
-            scope
-        ) + saved_markets,
-        sport=sport,
-        scope=scope
-    )
-
-
-def _include_session_option(
-    options,
-    key
-):
-    options = list(options or [])
-    current = st.session_state.get(key)
-
-    if current is None:
-        return options
-
-    current = str(current).strip()
-
-    if not current:
-        return options
-
-    existing = {
-        str(value).casefold()
-        for value in options
-    }
-
-    if current.casefold() not in existing:
-        options.append(current)
-
-    return options
-
-
-def infer_saved_custom_market_format(
-    sport,
-    scope,
-    market
-):
-    try:
-        response = (
-            supabase
-            .table("bets")
-            .select("side,line")
-            .eq("is_deleted", False)
-            .eq("sport", sport)
-            .eq("scope", scope)
-            .eq("market", market)
-            .limit(1)
-            .execute()
-        )
-
-        rows = response.data or []
-
-        if not rows:
-            return "Over / Under"
-
-        row = rows[0]
-        side = row.get("side") or ""
-        line = row.get("line")
-
-        if side in ["Yes", "No"]:
-            return "Yes / No"
-
-        winner_sides = get_winner_side_options(
-            sport,
-            market
-        )
-
-        if side in winner_sides:
-            if line is None:
-                return "Winner / Selection"
-            return "Handicap / Spread"
-
-    except Exception:
-        pass
-
-    return "Over / Under"
-
-
-
-
 def add_bet_page():
 
     st.header("➕ Add Bet")
 
-    def ensure_valid(
-        key,
-        options,
-        default=None
-    ):
-        if key not in st.session_state:
-            return
 
-        current = st.session_state[key]
-
-        if current in options:
-            return
-
-        if default is not None:
-            st.session_state[key] = default
-        else:
-            st.session_state.pop(key, None)
-
-    ensure_valid(
-        "add_sport",
-        SPORTS,
-        DEFAULT_SPORT
-    )
-
-    sport = st.selectbox(
-        "Sport",
-        SPORTS,
-        key="add_sport"
-    )
-
-    previous_sport = (
-        st.session_state
-        .get("_add_last_sport")
-    )
-
-    if previous_sport is None:
-        st.session_state[
-            "_add_last_sport"
-        ] = sport
-
-    elif previous_sport != sport:
-        dependent_keys = [
-            "add_scope",
-            "add_regular_event",
-            "add_outright_event",
-            "add_player",
-            "add_team",
-            "add_outright_market",
-            "add_outright_subject",
-            "add_outright_selection_2",
-            "add_market_player",
-            "add_market_team",
-            "add_market_match",
-            "add_period",
-            "add_side",
-            "add_line",
-            "add_self_primary_reason",
-            "add_self_secondary_reason",
-            "add_tipster_primary_reason",
-            "add_tipster_secondary_reason"
-        ]
-
-        for key in dependent_keys:
-            st.session_state.pop(
-                key,
-                None
-            )
-
-        st.session_state[
-            "_add_last_sport"
-        ] = sport
-
-        st.rerun()
+    # ======================================
+    # DATE / LEAGUE
+    # ======================================
 
     col1, col2 = st.columns(2)
 
+
     with col1:
+
         bet_date = st.date_input(
             "Bet Date",
-            value=date.today(),
-            key="add_bet_date"
+            value=date.today()
         )
+
 
     with col2:
-        league_options = (
-            load_user_league_options(
-                sport
-            )
-        )
-
-        league_key = (
-            f"add_league_"
-            f"{sport.lower()}"
-        )
-
-        league_options = (
-            _include_session_option(
-                league_options,
-                league_key
-            )
-        )
 
         league = st.selectbox(
-            "League / Tour",
-            league_options,
-            accept_new_options=True,
-            key=league_key
+            "League",
+            LEAGUES
         )
 
-    is_live = st.checkbox(
-        "🔴 Live Bet",
-        value=False,
-        key="add_is_live",
-        help=(
-            "Leave unchecked for a pre-live bet. "
-            "Check it only if the bet was placed live."
-        )
-    )
 
-    scope_options = (
-        get_scope_options(
-            sport
-        )
-    )
-
-    ensure_valid(
-        "add_scope",
-        scope_options,
-        scope_options[0]
-    )
+    # ======================================
+    # SCOPE
+    # ======================================
 
     scope = st.radio(
         "Bet Type",
-        scope_options,
-        horizontal=True,
-        key="add_scope"
+        [
+            "PLAYER",
+            "TEAM",
+            "MATCH",
+            "OUTRIGHT"
+        ],
+        horizontal=True
     )
+
 
     entry_suggestions = (
-        load_entry_suggestions(
-            sport
-        )
+        load_entry_suggestions()
     )
 
-    for _bucket in [
-        "regular_events",
-        "outright_events",
-        "players",
-        "teams"
-    ]:
-        entry_suggestions[_bucket] = (
-            _merge_recent_entry_options(
-                _bucket,
-                entry_suggestions.get(
-                    _bucket,
-                    []
-                ),
-                sport=sport
-            )
-        )
 
     event_options = (
-        entry_suggestions["outright_events"]
+        entry_suggestions[
+            "outright_events"
+        ]
         if scope == "OUTRIGHT"
-        else entry_suggestions["regular_events"]
+        else entry_suggestions[
+            "regular_events"
+        ]
     )
 
-    event_key = (
-        "add_outright_event"
-        if scope == "OUTRIGHT"
-        else "add_regular_event"
-    )
-
-    event_options = (
-        _include_session_option(
-            event_options,
-            event_key
-        )
-    )
 
     event = st.selectbox(
         (
-            "Tournament / Event"
-            if (
-                sport == "Tennis"
-                and scope == "OUTRIGHT"
-            )
-            else (
-                "Competition / Event"
-                if scope == "OUTRIGHT"
-                else "Event"
-            )
+            "Competition / Event"
+            if scope == "OUTRIGHT"
+            else "Event"
         ),
         event_options,
         index=None,
         placeholder=(
-            "Search or enter tournament..."
-            if (
-                sport == "Tennis"
-                and scope == "OUTRIGHT"
-            )
-            else (
-                "Search or enter competition..."
-                if scope == "OUTRIGHT"
-                else "Search or enter matchup..."
-            )
+            "Search or enter competition..."
+            if scope == "OUTRIGHT"
+            else "Search or enter matchup..."
         ),
-        accept_new_options=True,
-        key=event_key
+        accept_new_options=True
     )
 
+
     st.divider()
+
 
     subject = None
     selection_2 = None
     line = None
     side = None
 
-    if scope == "OUTRIGHT":
-        market_options = (
-            load_user_market_options(
-                sport,
-                scope
-            )
-        )
 
-        market_options = (
-            _include_session_option(
-                market_options,
-                "add_outright_market"
-            )
-        )
+    # ======================================
+    # OUTRIGHT
+    # ======================================
+
+    if scope == "OUTRIGHT":
 
         market = st.selectbox(
             "Outright Market",
-            market_options,
-            accept_new_options=True,
-            key="add_outright_market"
+            OUTRIGHT_MARKETS
         )
+
 
         label_1, label_2 = (
             outright_selection_labels(
-                market,
-                sport
+                market
             )
         )
 
-        if (
-            sport == "Tennis"
-            or label_1 == "Player"
-            or label_1.startswith("Player ")
-        ):
+
+        if label_1 == "Player":
+
             outright_options_1 = (
-                entry_suggestions["players"]
+                entry_suggestions[
+                    "players"
+                ]
             )
+
         else:
+
             outright_options_1 = (
-                entry_suggestions["teams"]
+                entry_suggestions[
+                    "teams"
+                ]
             )
 
-        outright_options_1 = (
-            _include_session_option(
-                outright_options_1,
-                "add_outright_subject"
-            )
-        )
 
         subject = st.selectbox(
             label_1,
@@ -1626,37 +1302,30 @@ def add_bet_page():
                 f"Search or enter "
                 f"{label_1.lower()}..."
             ),
-            accept_new_options=True,
-            key="add_outright_subject"
+            accept_new_options=True
         )
 
-        if label_2:
-            second_options = (
-                entry_suggestions["players"]
-                if sport == "Tennis"
-                else entry_suggestions["teams"]
-            )
 
-            second_options = (
-                _include_session_option(
-                    second_options,
-                    "add_outright_selection_2"
+        if label_2:
+
+            selection_2 = (
+                st.selectbox(
+                    label_2,
+                    entry_suggestions[
+                        "teams"
+                    ],
+                    index=None,
+                    placeholder=(
+                        f"Search or enter "
+                        f"{label_2.lower()}..."
+                    ),
+                    accept_new_options=True
                 )
             )
 
-            selection_2 = st.selectbox(
-                label_2,
-                second_options,
-                index=None,
-                placeholder=(
-                    f"Search or enter "
-                    f"{label_2.lower()}..."
-                ),
-                accept_new_options=True,
-                key="add_outright_selection_2"
-            )
 
         period = "Full Competition"
+
 
         st.caption(
             "🏆 This bet will be stored "
@@ -1664,282 +1333,152 @@ def add_bet_page():
             "pending bets."
         )
 
+
+    # ======================================
+    # REGULAR BETS
+    # ======================================
+
     else:
+
         if scope == "PLAYER":
-            player_options = (
-                _include_session_option(
-                    entry_suggestions["players"],
-                    "add_player"
-                )
-            )
 
             subject = st.selectbox(
                 "Player",
-                player_options,
+                entry_suggestions[
+                    "players"
+                ],
                 index=None,
                 placeholder=(
                     "Search or enter player..."
                 ),
-                accept_new_options=True,
-                key="add_player"
+                accept_new_options=True
             )
 
+
         elif scope == "TEAM":
-            team_options = (
-                _include_session_option(
-                    entry_suggestions["teams"],
-                    "add_team"
-                )
-            )
 
             subject = st.selectbox(
                 "Team",
-                team_options,
+                entry_suggestions[
+                    "teams"
+                ],
                 index=None,
                 placeholder=(
                     "Search or enter team..."
                 ),
-                accept_new_options=True,
-                key="add_team"
+                accept_new_options=True
             )
 
-        market_key = (
-            f"add_market_"
-            f"{scope.lower()}"
-        )
-
-        market_options = (
-            load_user_market_options(
-                sport,
-                scope
-            )
-        )
-
-        market_options = (
-            _include_session_option(
-                market_options,
-                market_key
-            )
-        )
 
         market = st.selectbox(
             "Market",
-            market_options,
-            accept_new_options=True,
-            key=market_key
-        )
-
-        periods = get_periods(
-            sport
-        )
-
-        ensure_valid(
-            "add_period",
-            periods,
-            periods[0]
-        )
-
-        period = st.selectbox(
-            "Period",
-            periods,
-            key="add_period"
-        )
-
-        default_markets = (
-            get_default_markets(
-                sport,
+            get_market_options(
                 scope
             )
         )
 
-        is_custom_market = (
-            market not in default_markets
+
+        period = st.selectbox(
+            "Period",
+            PERIODS
         )
 
-        if is_custom_market:
-            format_options = [
-                "Over / Under",
-                "Winner / Selection",
-                "Handicap / Spread",
-                "Yes / No"
-            ]
 
-            format_key = (
-                "add_custom_market_format_"
-                + sport
-                + "_"
-                + scope
-                + "_"
-                + market
-            )
-
-            if format_key not in st.session_state:
-                st.session_state[
-                    format_key
-                ] = (
-                    infer_saved_custom_market_format(
-                        sport,
-                        scope,
-                        market
-                    )
-                )
-
-            custom_market_format = (
-                st.selectbox(
-                    "Market Format",
-                    format_options,
-                    key=format_key
-                )
-            )
-
-            style_map = {
-                "Over / Under": "total",
-                "Winner / Selection": "winner",
-                "Handicap / Spread": "handicap",
-                "Yes / No": "yes_no"
-            }
-
-            market_style = (
-                style_map[
-                    custom_market_format
-                ]
-            )
-        else:
-            market_style = (
-                get_market_style(
-                    sport,
-                    scope,
-                    market
-                )
-            )
-
-        if market_style == "winner":
-            side_options = (
-                get_winner_side_options(
-                    sport,
-                    market
-                )
-            )
-
-            ensure_valid(
-                "add_side",
-                side_options,
-                side_options[0]
-            )
+        if market == "Moneyline":
 
             side = st.radio(
                 "Selection",
-                side_options,
-                horizontal=True,
-                key="add_side"
+                [
+                    "Home",
+                    "Away"
+                ],
+                horizontal=True
             )
 
-        elif market_style == "handicap":
-            side_options = (
-                get_winner_side_options(
-                    sport,
-                    market
-                )
-            )
 
-            ensure_valid(
-                "add_side",
-                side_options,
-                side_options[0]
-            )
+        elif (
+            market
+            == "Handicap / Spread"
+        ):
 
             side = st.radio(
                 "Selection",
-                side_options,
-                horizontal=True,
-                key="add_side"
+                [
+                    "Home",
+                    "Away"
+                ],
+                horizontal=True
             )
+
 
             line = st.number_input(
                 "Line",
                 step=0.5,
-                format="%.1f",
-                key="add_line"
+                format="%.1f"
             )
 
-        elif market_style == "yes_no":
-            side_options = [
-                "Yes",
-                "No"
-            ]
-
-            ensure_valid(
-                "add_side",
-                side_options,
-                "Yes"
-            )
-
-            side = st.radio(
-                "Selection",
-                side_options,
-                horizontal=True,
-                key="add_side"
-            )
 
         else:
-            side_options = [
-                "Over",
-                "Under"
-            ]
-
-            ensure_valid(
-                "add_side",
-                side_options,
-                "Over"
-            )
 
             side = st.radio(
                 "Side",
-                side_options,
-                horizontal=True,
-                key="add_side"
+                [
+                    "Over",
+                    "Under"
+                ],
+                horizontal=True
             )
+
 
             line = st.number_input(
                 "Line",
                 step=0.5,
-                format="%.1f",
-                key="add_line"
+                format="%.1f"
             )
+
+
+    # ======================================
+    # BOOKMAKER / ODDS
+    # ======================================
 
     st.divider()
 
+
     col1, col2 = st.columns(2)
 
+
     with col1:
-        ensure_valid(
-            "add_bookmaker",
-            BOOKMAKERS,
-            BOOKMAKERS[0]
-        )
 
         bookmaker = st.selectbox(
             "Bookmaker",
-            BOOKMAKERS,
-            key="add_bookmaker"
+            BOOKMAKERS
         )
 
+
     with col2:
+
         market_odds = st.number_input(
             "Odds Taken",
             min_value=1.01,
             value=1.90,
             step=0.01,
-            format="%.2f",
-            key="add_market_odds"
+            format="%.2f"
         )
+
+
+    # ======================================
+    # ORIGIN
+    # ======================================
 
     origin = st.radio(
         "Origin",
-        ["SELF", "TIPSTER"],
-        horizontal=True,
-        key="add_origin"
+        [
+            "SELF",
+            "TIPSTER"
+        ],
+        horizontal=True
     )
+
 
     my_odds = None
     tipster_id = None
@@ -1949,243 +1488,265 @@ def add_bet_page():
     secondary_reason = None
     confidence = None
 
-    reasons = get_reasons(
-        sport
-    )
+
+    # ======================================
+    # SELF
+    # ======================================
 
     if origin == "SELF":
+
         my_odds = st.number_input(
             "My Fair Odds",
             min_value=1.01,
             value=1.80,
             step=0.01,
-            format="%.2f",
-            key="add_self_fair_odds"
+            format="%.2f"
         )
 
-        confidence_options = [
-            "Low",
-            "Medium",
-            "High"
-        ]
-
-        ensure_valid(
-            "add_self_confidence",
-            confidence_options,
-            "Medium"
-        )
 
         confidence = st.radio(
             "Confidence",
-            confidence_options,
-            horizontal=True,
-            key="add_self_confidence"
+            [
+                "Low",
+                "Medium",
+                "High"
+            ],
+            index=1,
+            horizontal=True
         )
+
 
         reason_options = (
             ["Select reason..."]
-            + reasons
+            + REASONS
         )
 
-        ensure_valid(
-            "add_self_primary_reason",
-            reason_options,
-            "Projection Edge"
+        primary_reason = (
+            st.selectbox(
+                "Primary Reason",
+                reason_options,
+                index=reason_options.index(
+                    "Projection Edge"
+                )
+            )
         )
 
-        primary_reason = st.selectbox(
-            "Primary Reason",
-            reason_options,
-            key="add_self_primary_reason"
-        )
 
         secondary_options = (
             ["None"]
             + [
                 reason
-                for reason in reasons
-                if reason != primary_reason
+                for reason in REASONS
+                if reason
+                != primary_reason
             ]
         )
 
-        ensure_valid(
-            "add_self_secondary_reason",
-            secondary_options,
-            "None"
+
+        secondary_reason = (
+            st.selectbox(
+                "Secondary Reason",
+                secondary_options
+            )
         )
 
-        secondary_reason = st.selectbox(
-            "Secondary Reason",
-            secondary_options,
-            key="add_self_secondary_reason"
-        )
 
         has_own_reasoning = True
 
+
+    # ======================================
+    # TIPSTER
+    # ======================================
+
     else:
+
         tipsters = load_tipsters()
 
+
         tipster_map = {
-            t["name"]: t["id"]
+            t["name"]:
+                t["id"]
             for t in tipsters
         }
+
 
         existing_names = list(
             tipster_map.keys()
         )
 
-        tipster_options = (
-            ["+ Add new tipster"]
-            + existing_names
+
+        tipster_choice = (
+            st.selectbox(
+                "Tipster",
+                [
+                    "+ Add new tipster"
+                ]
+                + existing_names
+            )
         )
 
-        ensure_valid(
-            "add_tipster_choice",
-            tipster_options,
-            tipster_options[0]
-        )
 
-        tipster_choice = st.selectbox(
-            "Tipster",
-            tipster_options,
-            key="add_tipster_choice"
-        )
+        if (
+            tipster_choice
+            == "+ Add new tipster"
+        ):
 
-        if tipster_choice == "+ Add new tipster":
-            new_tipster = st.text_input(
-                "New Tipster Name",
-                key="add_new_tipster"
+            new_tipster = (
+                st.text_input(
+                    "New Tipster Name"
+                )
             )
 
+
             if st.button(
-                "Save Tipster",
-                key="save_tipster_button"
+                "Save Tipster"
             ):
+
                 try:
-                    record = create_tipster(
-                        new_tipster
+
+                    record = (
+                        create_tipster(
+                            new_tipster
+                        )
                     )
 
+
                     if record:
+
                         st.success(
                             "Tipster saved."
                         )
+
                         st.rerun()
 
+
                 except Exception as e:
-                    st.error(str(e))
+
+                    st.error(
+                        str(e)
+                    )
+
 
         else:
+
             tipster_id = (
                 tipster_map[
                     tipster_choice
                 ]
             )
 
-        add_posted_odds = st.checkbox(
-            "I know the tipster's "
-            "posted odds",
-            key="add_tipster_has_posted_odds"
+
+        add_posted_odds = (
+            st.checkbox(
+                "I know the tipster's "
+                "posted odds"
+            )
         )
 
+
         if add_posted_odds:
+
             tipster_posted_odds = (
                 st.number_input(
                     "Tipster Posted Odds",
                     min_value=1.01,
                     value=1.90,
                     step=0.01,
-                    format="%.2f",
-                    key="add_tipster_posted_odds"
+                    format="%.2f"
                 )
             )
 
-        tipster_confidence_options = [
-            "N/A",
-            "Low",
-            "Medium",
-            "High"
-        ]
-
-        ensure_valid(
-            "add_tipster_confidence",
-            tipster_confidence_options,
-            "N/A"
-        )
 
         confidence = st.radio(
             "Your Confidence",
-            tipster_confidence_options,
-            horizontal=True,
-            key="add_tipster_confidence"
+            [
+                "N/A",
+                "Low",
+                "Medium",
+                "High"
+            ],
+            index=0,
+            horizontal=True
         )
 
-        has_own_reasoning = st.checkbox(
-            "I also have my own "
-            "reasoning for this bet",
-            key="add_tipster_own_reasoning"
+
+        has_own_reasoning = (
+            st.checkbox(
+                "I also have my own "
+                "reasoning for this bet"
+            )
         )
+
 
         if has_own_reasoning:
+
             reason_options = (
                 ["Select reason..."]
-                + reasons
+                + REASONS
             )
 
-            ensure_valid(
-                "add_tipster_primary_reason",
-                reason_options,
-                "Projection Edge"
+            primary_reason = (
+                st.selectbox(
+                    "Primary Reason",
+                    reason_options,
+                    index=reason_options.index(
+                        "Projection Edge"
+                    )
+                )
             )
 
-            primary_reason = st.selectbox(
-                "Primary Reason",
-                reason_options,
-                key="add_tipster_primary_reason"
-            )
 
             secondary_options = (
                 ["None"]
                 + [
                     reason
-                    for reason in reasons
-                    if reason != primary_reason
+                    for reason in REASONS
+                    if reason
+                    != primary_reason
                 ]
             )
 
-            ensure_valid(
-                "add_tipster_secondary_reason",
-                secondary_options,
-                "None"
+
+            secondary_reason = (
+                st.selectbox(
+                    "Secondary Reason",
+                    secondary_options
+                )
             )
 
-            secondary_reason = st.selectbox(
-                "Secondary Reason",
-                secondary_options,
-                key="add_tipster_secondary_reason"
-            )
+
+    # ======================================
+    # STAKE / NOTES
+    # ======================================
 
     st.divider()
+
 
     stake = st.number_input(
         "Stake",
         min_value=0.01,
         value=10.00,
-        step=1.00,
-        key="add_stake"
+        step=1.00
     )
+
 
     notes = st.text_area(
         "Notes",
-        placeholder="Optional",
-        key="add_notes"
+        placeholder="Optional"
     )
 
+
+    # ======================================
+    # VALUE PREVIEW
+    # ======================================
+
     if origin == "SELF":
+
         preview = calculate_metrics(
             market_odds,
             my_odds
         )
+
 
         st.info(
             f"Market probability: "
@@ -2198,72 +1759,94 @@ def add_bet_page():
             f"{preview['ev_pct']:.2f}%"
         )
 
+
+    # ======================================
+    # SAVE
+    # ======================================
+
     if st.button(
         "💾 SAVE BET",
         type="primary",
-        use_container_width=True,
-        key="save_bet_button"
+        use_container_width=True
     ):
-        if not (
-            event
-            and str(event).strip()
-        ):
+
+
+        if not event.strip():
+
             st.error(
                 "Event / Competition "
                 "is required."
             )
+
             return
 
+
         if (
-            scope in ["PLAYER", "TEAM"]
+            scope in [
+                "PLAYER",
+                "TEAM"
+            ]
             and not (
                 subject
-                and str(subject).strip()
+                and subject.strip()
             )
         ):
+
             st.error(
                 "Player / Team is required."
             )
+
             return
 
+
         if scope == "OUTRIGHT":
+
             if not (
                 subject
-                and str(subject).strip()
+                and subject.strip()
             ):
+
                 st.error(
                     "Outright selection "
                     "is required."
                 )
+
                 return
+
 
             if (
                 outright_needs_second_selection(
-                    market,
-                    sport
+                    market
                 )
                 and not (
                     selection_2
-                    and str(selection_2).strip()
+                    and selection_2.strip()
                 )
             ):
+
                 st.error(
                     "The second selection "
                     "is required."
                 )
+
                 return
+
 
         if (
             origin == "TIPSTER"
             and tipster_id is None
         ):
+
             st.error(
                 "Select or create a tipster."
             )
+
             return
 
+
         if (
-            primary_reason == "Select reason..."
+            primary_reason
+            == "Select reason..."
             and (
                 origin == "SELF"
                 or (
@@ -2272,10 +1855,13 @@ def add_bet_page():
                 )
             )
         ):
+
             st.error(
                 "Select a Primary Reason."
             )
+
             return
+
 
         metrics = calculate_metrics(
             market_odds,
@@ -2283,66 +1869,133 @@ def add_bet_page():
             tipster_posted_odds
         )
 
+
         record = {
-            "user_id": st.session_state.user_id,
-            "bet_date": bet_date.isoformat(),
-            "is_live": bool(is_live),
-            "sport": sport,
-            "league": league,
-            "event": str(event).strip(),
-            "scope": scope,
-            "subject": (
-                str(subject).strip()
-                if subject
-                else None
-            ),
-            "selection_2": (
-                str(selection_2).strip()
-                if selection_2
-                else None
-            ),
-            "market": market,
-            "period": period,
-            "side": side,
-            "line": line,
-            "bookmaker": bookmaker,
-            "market_odds": market_odds,
-            "my_odds": my_odds,
-            "origin": origin,
-            "tipster_id": tipster_id,
-            "tipster_posted_odds": tipster_posted_odds,
-            "confidence": confidence,
-            "has_own_reasoning": has_own_reasoning,
-            "primary_reason": (
-                None
-                if primary_reason == "Select reason..."
-                else primary_reason
-            ),
-            "secondary_reason": (
-                None
-                if secondary_reason in [None, "None"]
-                else secondary_reason
-            ),
-            "stake": stake,
-            "result": "Pending",
-            "p_market": metrics["p_market"],
-            "p_you": metrics["p_you"],
-            "edge_pp": metrics["edge_pp"],
-            "ev_pct": metrics["ev_pct"],
-            "price_deterioration_pp": (
+
+            "user_id":
+                st.session_state.user_id,
+
+            "bet_date":
+                bet_date.isoformat(),
+
+            "sport":
+                SPORT,
+
+            "league":
+                league,
+
+            "event":
+                event.strip(),
+
+            "scope":
+                scope,
+
+            "subject":
+                (
+                    subject.strip()
+                    if subject
+                    else None
+                ),
+
+            "selection_2":
+                (
+                    selection_2.strip()
+                    if selection_2
+                    else None
+                ),
+
+            "market":
+                market,
+
+            "period":
+                period,
+
+            "side":
+                side,
+
+            "line":
+                line,
+
+            "bookmaker":
+                bookmaker,
+
+            "market_odds":
+                market_odds,
+
+            "my_odds":
+                my_odds,
+
+            "origin":
+                origin,
+
+            "tipster_id":
+                tipster_id,
+
+            "tipster_posted_odds":
+                tipster_posted_odds,
+
+            "confidence":
+                confidence,
+
+            "has_own_reasoning":
+                has_own_reasoning,
+
+            "primary_reason":
+                (
+                    None
+                    if primary_reason
+                    == "Select reason..."
+                    else primary_reason
+                ),
+
+            "secondary_reason":
+                (
+                    None
+                    if secondary_reason
+                    in [
+                        None,
+                        "None"
+                    ]
+                    else secondary_reason
+                ),
+
+            "stake":
+                stake,
+
+            "result":
+                "Pending",
+
+            "p_market":
+                metrics["p_market"],
+
+            "p_you":
+                metrics["p_you"],
+
+            "edge_pp":
+                metrics["edge_pp"],
+
+            "ev_pct":
+                metrics["ev_pct"],
+
+            "price_deterioration_pp":
                 metrics[
                     "price_deterioration_pp"
-                ]
-            ),
-            "profit": 0,
-            "notes": (
-                notes.strip()
-                if notes.strip()
-                else None
-            )
+                ],
+
+            "profit":
+                0,
+
+            "notes":
+                (
+                    notes.strip()
+                    if notes.strip()
+                    else None
+                )
         }
 
+
         try:
+
             response = (
                 supabase
                 .table("bets")
@@ -2350,101 +2003,8 @@ def add_bet_page():
                 .execute()
             )
 
+
             if response.data:
-                _remember_entry_value(
-                    "leagues",
-                    league,
-                    sport=sport
-                )
-
-                _remember_entry_value(
-                    "markets",
-                    market,
-                    sport=sport,
-                    scope=scope
-                )
-
-                if scope == "OUTRIGHT":
-                    _remember_entry_value(
-                        "outright_events",
-                        event,
-                        sport=sport
-                    )
-
-                    if sport == "Tennis":
-                        _remember_entry_value(
-                            "players",
-                            subject,
-                            sport=sport
-                        )
-                        _remember_entry_value(
-                            "players",
-                            selection_2,
-                            sport=sport
-                        )
-
-                    elif (
-                        sport == "Football"
-                        and market in [
-                            "Top Goalscorer",
-                            "Top Assists"
-                        ]
-                    ):
-                        _remember_entry_value(
-                            "players",
-                            subject,
-                            sport=sport
-                        )
-
-                    elif (
-                        sport == "Basketball"
-                        and market.startswith("Top ")
-                    ):
-                        _remember_entry_value(
-                            "players",
-                            subject,
-                            sport=sport
-                        )
-
-                        if market.endswith(" - Team"):
-                            _remember_entry_value(
-                                "teams",
-                                selection_2,
-                                sport=sport
-                            )
-
-                    else:
-                        _remember_entry_value(
-                            "teams",
-                            subject,
-                            sport=sport
-                        )
-                        _remember_entry_value(
-                            "teams",
-                            selection_2,
-                            sport=sport
-                        )
-
-                else:
-                    _remember_entry_value(
-                        "regular_events",
-                        event,
-                        sport=sport
-                    )
-
-                    if scope == "PLAYER":
-                        _remember_entry_value(
-                            "players",
-                            subject,
-                            sport=sport
-                        )
-
-                    elif scope == "TEAM":
-                        _remember_entry_value(
-                            "teams",
-                            subject,
-                            sport=sport
-                        )
 
                 st.success(
                     "✅ Bet saved successfully!"
@@ -2455,13 +2015,12 @@ def add_bet_page():
                     f"{get_total_bets_count()}"
                 )
 
+
         except Exception as e:
+
             st.error(
                 f"Could not save bet: {e}"
             )
-
-
-
 
 
 # ==========================================
@@ -2533,7 +2092,6 @@ def render_pending_group(
         if bet["scope"] == "OUTRIGHT":
 
             st.caption(
-                f"{bet.get('sport') or DEFAULT_SPORT} | "
                 f"🏆 {bet['league']} | "
                 f"{bet['bookmaker']}"
             )
@@ -2541,7 +2099,6 @@ def render_pending_group(
         else:
 
             st.caption(
-                f"{bet.get('sport') or DEFAULT_SPORT} | "
                 f"{bet['league']} | "
                 f"{bet['period']} | "
                 f"{bet['bookmaker']}"
@@ -2827,28 +2384,21 @@ def history_page():
         return
 
 
-    sports = sorted(
-        list(
-            set(
-                (
-                    bet.get("sport")
-                    or DEFAULT_SPORT
-                )
-                for bet in history
-            )
-        )
-    )
-
-
     col1, col2 = st.columns(2)
 
 
     with col1:
 
-        sport_filter = st.selectbox(
-            "Sport",
-            ["All"] + sports,
-            key="history_sport"
+        scope_filter = st.selectbox(
+            "Bet Type",
+            [
+                "All",
+                "PLAYER",
+                "TEAM",
+                "MATCH",
+                "OUTRIGHT"
+            ],
+            key="history_scope"
         )
 
 
@@ -2867,65 +2417,11 @@ def history_page():
         )
 
 
-    timing_filter = st.selectbox(
-        "Bet Timing",
-        [
-            "All",
-            "Pre-live",
-            "Live"
-        ],
-        key="history_timing"
-    )
-
-
-    scope_source = [
-        bet
-        for bet in history
-        if (
-            sport_filter == "All"
-            or (
-                bet.get("sport")
-                or DEFAULT_SPORT
-            )
-            == sport_filter
-        )
-    ]
-
-
-    scopes = sorted(
-        list(
-            set(
-                bet["scope"]
-                for bet in scope_source
-                if bet.get("scope")
-            )
-        )
-    )
-
-
-    scope_filter = st.selectbox(
-        "Bet Type",
-        ["All"] + scopes,
-        key="history_scope"
-    )
-
-
-    league_source = [
-        bet
-        for bet in scope_source
-        if (
-            scope_filter == "All"
-            or bet["scope"]
-            == scope_filter
-        )
-    ]
-
-
     leagues = sorted(
         list(
             set(
                 bet["league"]
-                for bet in league_source
+                for bet in history
                 if bet["league"]
             )
         )
@@ -2958,19 +2454,6 @@ def history_page():
 
 
     filtered = history.copy()
-
-
-    if sport_filter != "All":
-
-        filtered = [
-            bet
-            for bet in filtered
-            if (
-                bet.get("sport")
-                or DEFAULT_SPORT
-            )
-            == sport_filter
-        ]
 
 
     if scope_filter != "All":
@@ -3010,28 +2493,6 @@ def history_page():
             for bet in filtered
             if bet["origin"]
             == origin_filter
-        ]
-
-
-    if timing_filter == "Live":
-
-        filtered = [
-            bet
-            for bet in filtered
-            if bool(
-                bet.get("is_live", False)
-            )
-        ]
-
-
-    elif timing_filter == "Pre-live":
-
-        filtered = [
-            bet
-            for bet in filtered
-            if not bool(
-                bet.get("is_live", False)
-            )
         ]
 
 
@@ -3146,24 +2607,6 @@ def history_page():
 
             "Date":
                 bet["bet_date"],
-
-            "Sport":
-                (
-                    bet.get("sport")
-                    or DEFAULT_SPORT
-                ),
-
-            "Timing":
-                (
-                    "Live"
-                    if bool(
-                        bet.get(
-                            "is_live",
-                            False
-                        )
-                    )
-                    else "Pre-live"
-                ),
 
             "League":
                 bet["league"],
@@ -3326,17 +2769,8 @@ def manage_bets_page():
 
     bet_id = bet["id"]
 
-    edit_sport = (
-        bet.get("sport")
-        or DEFAULT_SPORT
-    )
-
 
     st.divider()
-
-    st.caption(
-        f"Sport: {edit_sport}"
-    )
 
     st.subheader(
         "Edit Bet"
@@ -3364,46 +2798,23 @@ def manage_bets_page():
 
     with col2:
 
-        edit_league_options = (
-            load_user_league_options(
-                edit_sport
-            )
-        )
-
-        if (
-            bet["league"]
-            not in edit_league_options
-        ):
-            edit_league_options.append(
-                bet["league"]
-            )
-
         edit_league = st.selectbox(
-            "League / Tour",
-            edit_league_options,
+            "League",
+            LEAGUES,
             index=safe_index(
-                edit_league_options,
+                LEAGUES,
                 bet["league"]
             ),
-            accept_new_options=True,
             key=f"edit_league_{bet_id}"
         )
 
 
-    edit_is_live = st.checkbox(
-        "🔴 Live Bet",
-        value=bool(
-            bet.get("is_live", False)
-        ),
-        key=f"edit_is_live_{bet_id}"
-    )
-
-
-    scope_options = (
-        get_scope_options(
-            edit_sport
-        )
-    )
+    scope_options = [
+        "PLAYER",
+        "TEAM",
+        "MATCH",
+        "OUTRIGHT"
+    ]
 
 
     edit_scope = st.radio(
@@ -3442,37 +2853,20 @@ def manage_bets_page():
 
     if edit_scope == "OUTRIGHT":
 
-        edit_market_options = (
-            load_user_market_options(
-                edit_sport,
-                "OUTRIGHT"
-            )
-        )
-
-        if (
-            bet["market"]
-            not in edit_market_options
-        ):
-            edit_market_options.append(
-                bet["market"]
-            )
-
         edit_market = st.selectbox(
             "Outright Market",
-            edit_market_options,
+            OUTRIGHT_MARKETS,
             index=safe_index(
-                edit_market_options,
+                OUTRIGHT_MARKETS,
                 bet["market"]
             ),
-            accept_new_options=True,
             key=f"edit_market_{bet_id}"
         )
 
 
         label_1, label_2 = (
             outright_selection_labels(
-                edit_market,
-                edit_sport
+                edit_market
             )
         )
 
@@ -3557,19 +2951,10 @@ def manage_bets_page():
 
 
         edit_market_options = (
-            load_user_market_options(
-                edit_sport,
+            get_market_options(
                 edit_scope
             )
         )
-
-        if (
-            bet["market"]
-            not in edit_market_options
-        ):
-            edit_market_options.append(
-                bet["market"]
-            )
 
 
         edit_market = st.selectbox(
@@ -3579,92 +2964,27 @@ def manage_bets_page():
                 edit_market_options,
                 bet["market"]
             ),
-            accept_new_options=True,
             key=f"edit_market_{bet_id}"
         )
 
 
-        edit_period_options = (
-            get_periods(
-                edit_sport
-            )
-        )
-
-        if (
-            bet["period"]
-            and bet["period"]
-            not in edit_period_options
-        ):
-            edit_period_options.append(
-                bet["period"]
-            )
-
-
         edit_period = st.selectbox(
             "Period",
-            edit_period_options,
+            PERIODS,
             index=safe_index(
-                edit_period_options,
+                PERIODS,
                 bet["period"]
             ),
             key=f"edit_period_{bet_id}"
         )
 
 
-        default_edit_markets = (
-            get_default_markets(
-                edit_sport,
-                edit_scope
-            )
-        )
+        if edit_market == "Moneyline":
 
-
-        if (
-            edit_market
-            in default_edit_markets
-        ):
-
-            edit_market_style = (
-                get_market_style(
-                    edit_sport,
-                    edit_scope,
-                    edit_market
-                )
-            )
-
-        else:
-
-            edit_market_style = (
-                infer_saved_custom_market_format(
-                    edit_sport,
-                    edit_scope,
-                    edit_market
-                )
-            )
-
-            edit_market_style = {
-                "Over / Under":
-                    "total",
-                "Winner / Selection":
-                    "winner",
-                "Handicap / Spread":
-                    "handicap",
-                "Yes / No":
-                    "yes_no"
-            }.get(
-                edit_market_style,
-                "total"
-            )
-
-
-        if edit_market_style == "winner":
-
-            side_options = (
-                get_winner_side_options(
-                    edit_sport,
-                    edit_market
-                )
-            )
+            side_options = [
+                "Home",
+                "Away"
+            ]
 
 
             edit_side = st.radio(
@@ -3679,14 +2999,15 @@ def manage_bets_page():
             )
 
 
-        elif edit_market_style == "handicap":
+        elif (
+            edit_market
+            == "Handicap / Spread"
+        ):
 
-            side_options = (
-                get_winner_side_options(
-                    edit_sport,
-                    edit_market
-                )
-            )
+            side_options = [
+                "Home",
+                "Away"
+            ]
 
 
             edit_side = st.radio(
@@ -3715,26 +3036,6 @@ def manage_bets_page():
                         f"{bet_id}"
                     )
                 )
-            )
-
-
-        elif edit_market_style == "yes_no":
-
-            side_options = [
-                "Yes",
-                "No"
-            ]
-
-
-            edit_side = st.radio(
-                "Selection",
-                side_options,
-                index=safe_index(
-                    side_options,
-                    bet["side"]
-                ),
-                horizontal=True,
-                key=f"edit_side_{bet_id}"
             )
 
 
@@ -3842,12 +3143,6 @@ def manage_bets_page():
     edit_primary = None
     edit_secondary = None
 
-    edit_reasons = (
-        get_reasons(
-            edit_sport
-        )
-    )
-
 
     if edit_origin == "SELF":
 
@@ -3893,7 +3188,7 @@ def manage_bets_page():
 
         reason_options = (
             ["Select reason..."]
-            + edit_reasons
+            + REASONS
         )
 
 
@@ -3917,7 +3212,7 @@ def manage_bets_page():
             ["None"]
             + [
                 reason
-                for reason in edit_reasons
+                for reason in REASONS
                 if reason
                 != edit_primary
             ]
@@ -4101,7 +3396,7 @@ def manage_bets_page():
 
             reason_options = (
                 ["Select reason..."]
-                + edit_reasons
+                + REASONS
             )
 
 
@@ -4127,7 +3422,7 @@ def manage_bets_page():
                 ["None"]
                 + [
                     reason
-                    for reason in edit_reasons
+                    for reason in REASONS
                     if reason
                     != edit_primary
                 ]
@@ -4276,8 +3571,7 @@ def manage_bets_page():
         if (
             edit_scope == "OUTRIGHT"
             and outright_needs_second_selection(
-                edit_market,
-                edit_sport
+                edit_market
             )
             and not (
                 edit_selection_2
@@ -4392,12 +3686,6 @@ def manage_bets_page():
 
 
         update_record = {
-
-            "sport":
-                edit_sport,
-
-            "is_live":
-                bool(edit_is_live),
 
             "bet_date":
                 edit_date.isoformat(),
@@ -4733,7 +4021,6 @@ def trash_page():
 
 
         st.caption(
-            f"{bet.get('sport') or DEFAULT_SPORT} | "
             f"{bet['league']} | "
             f"Odds {float(bet['market_odds']):.2f} | "
             f"Result: {bet['result']}"
@@ -4804,11 +4091,11 @@ with st.sidebar:
 # ==========================================
 
 st.title(
-    "🎯 Bet Tracker"
+    "🏀 Bet Tracker"
 )
 
 st.caption(
-    "Personal betting & analytics tracker"
+    "Personal basketball betting tracker"
 )
 
 
