@@ -250,6 +250,20 @@ def analysis_page(
 
 
     # ======================================
+    # BET TIMING
+    # ======================================
+
+    if "is_live" not in df.columns:
+        df["is_live"] = False
+
+    df["is_live"] = (
+        df["is_live"]
+        .fillna(False)
+        .astype(bool)
+    )
+
+
+    # ======================================
     # FILTERS
     # ======================================
 
@@ -258,21 +272,84 @@ def analysis_page(
     )
 
 
+    def safe_filter_state(
+        key,
+        options
+    ):
+
+        current = (
+            st.session_state
+            .get(key)
+        )
+
+        if (
+            current is not None
+            and current not in options
+        ):
+
+            st.session_state[
+                key
+            ] = "All"
+
+
+    sport_options = (
+        ["All"]
+        + sorted(
+            df["sport"]
+            .dropna()
+            .unique()
+            .tolist()
+        )
+    )
+
+
+    safe_filter_state(
+        "analysis_sport",
+        sport_options
+    )
+
+
     c1, c2 = st.columns(2)
 
 
     with c1:
 
-        scope_options = (
-            ["All"]
-            + sorted(
-                df["scope"]
-                .dropna()
-                .unique()
-                .tolist()
-            )
+        sport_filter = st.selectbox(
+            "Sport",
+            sport_options,
+            key="analysis_sport"
         )
 
+
+    sport_source = df.copy()
+
+
+    if sport_filter != "All":
+
+        sport_source = sport_source[
+            sport_source["sport"]
+            == sport_filter
+        ]
+
+
+    scope_options = (
+        ["All"]
+        + sorted(
+            sport_source["scope"]
+            .dropna()
+            .unique()
+            .tolist()
+        )
+    )
+
+
+    safe_filter_state(
+        "analysis_scope",
+        scope_options
+    )
+
+
+    with c2:
 
         scope_filter = st.selectbox(
             "Bet Type",
@@ -281,37 +358,59 @@ def analysis_page(
         )
 
 
-    with c2:
-
-        league_options = (
-            ["All"]
-            + sorted(
-                df["league"]
-                .dropna()
-                .unique()
-                .tolist()
-            )
-        )
-
-
-        league_filter = st.selectbox(
-            "League",
-            league_options,
-            key="analysis_league"
-        )
-
-
-    # Market depends on selected scope
-
-    market_source = df.copy()
+    league_source = (
+        sport_source.copy()
+    )
 
 
     if scope_filter != "All":
 
+        league_source = (
+            league_source[
+                league_source["scope"]
+                == scope_filter
+            ]
+        )
+
+
+    league_options = (
+        ["All"]
+        + sorted(
+            league_source["league"]
+            .dropna()
+            .unique()
+            .tolist()
+        )
+    )
+
+
+    safe_filter_state(
+        "analysis_league",
+        league_options
+    )
+
+
+    league_filter = st.selectbox(
+        "League / Tour",
+        league_options,
+        key="analysis_league"
+    )
+
+
+    # Market depends on Sport,
+    # Bet Type and League.
+
+    market_source = (
+        league_source.copy()
+    )
+
+
+    if league_filter != "All":
+
         market_source = (
             market_source[
-                market_source["scope"]
-                == scope_filter
+                market_source["league"]
+                == league_filter
             ]
         )
 
@@ -327,6 +426,12 @@ def analysis_page(
     )
 
 
+    safe_filter_state(
+        "analysis_market",
+        market_options
+    )
+
+
     c1, c2 = st.columns(2)
 
 
@@ -339,18 +444,39 @@ def analysis_page(
         )
 
 
-    with c2:
+    side_source = (
+        market_source.copy()
+    )
 
-        side_options = (
-            ["All"]
-            + sorted(
-                df["side"]
-                .dropna()
-                .unique()
-                .tolist()
-            )
+
+    if market_filter != "All":
+
+        side_source = (
+            side_source[
+                side_source["market"]
+                == market_filter
+            ]
         )
 
+
+    side_options = (
+        ["All"]
+        + sorted(
+            side_source["side"]
+            .dropna()
+            .unique()
+            .tolist()
+        )
+    )
+
+
+    safe_filter_state(
+        "analysis_side",
+        side_options
+    )
+
+
+    with c2:
 
         side_filter = st.selectbox(
             "Side",
@@ -442,6 +568,17 @@ def analysis_page(
         )
 
 
+    timing_filter = st.selectbox(
+        "Bet Timing",
+        [
+            "All",
+            "Pre-live",
+            "Live"
+        ],
+        key="analysis_timing"
+    )
+
+
     c1, c2 = st.columns(2)
 
 
@@ -471,11 +608,18 @@ def analysis_page(
 
     with c2:
 
-        player_source = (
-            df[
-                df["scope"]
+        player_source_df = (
+            sport_source[
+                sport_source["scope"]
                 == "PLAYER"
-            ]["subject"]
+            ]
+        )
+
+
+        player_source = (
+            player_source_df[
+                "subject"
+            ]
             .dropna()
             .unique()
             .tolist()
@@ -504,6 +648,14 @@ def analysis_page(
     # ======================================
 
     filtered = df.copy()
+
+
+    if sport_filter != "All":
+
+        filtered = filtered[
+            filtered["sport"]
+            == sport_filter
+        ]
 
 
     if scope_filter != "All":
@@ -567,6 +719,20 @@ def analysis_page(
         filtered = filtered[
             filtered["result"]
             == result_filter
+        ]
+
+
+    if timing_filter == "Live":
+
+        filtered = filtered[
+            filtered["is_live"]
+        ]
+
+
+    elif timing_filter == "Pre-live":
+
+        filtered = filtered[
+            ~filtered["is_live"]
         ]
 
 
@@ -1351,9 +1517,18 @@ def analysis_page(
         axis=1
     )
 
+    filtered[
+        "bet_timing"
+    ] = filtered["is_live"].map({
+        True: "Live",
+        False: "Pre-live"
+    })
+
 
     columns_to_show = [
         "bet_date",
+        "sport",
+        "bet_timing",
         "league",
         "scope",
         "event",
